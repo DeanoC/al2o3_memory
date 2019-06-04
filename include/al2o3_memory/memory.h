@@ -20,11 +20,19 @@ typedef struct Memory_Allocator {
 } Memory_Allocator;
 
 AL2O3_EXTERN_C Memory_Allocator Memory_GlobalAllocator;
+AL2O3_EXTERN_C Memory_Allocator Memory_GlobalTempAllocator;
 
 AL2O3_EXTERN_C void* Memory_DefaultMalloc(size_t size);
 AL2O3_EXTERN_C void* Memory_DefaultCalloc(size_t count, size_t size);
 AL2O3_EXTERN_C void* Memory_DefaultRealloc(void* memory, size_t size);
 AL2O3_EXTERN_C void Memory_DefaultFree(void* memory);
+
+// temp allocs shouldn't be expected to live that long, they may come out of faster
+// smaller pool
+AL2O3_EXTERN_C void* Memory_DefaultTempMalloc(size_t size);
+AL2O3_EXTERN_C void* Memory_DefaultTempCalloc(size_t count, size_t size);
+AL2O3_EXTERN_C void* Memory_DefaultTempRealloc(void* memory, size_t size);
+AL2O3_EXTERN_C void Memory_DefaultTempFree(void* memory);
 
 #define MEMORY_ALLOCATOR_MALLOC(size, allocator) (allocator)->malloc(size)
 #define MEMORY_ALLOCATOR_CALLOC(count, size, allocator) (allocator)->calloc(count, size)
@@ -35,5 +43,19 @@ AL2O3_EXTERN_C void Memory_DefaultFree(void* memory);
 #define MEMORY_CALLOC(count, size) Memory_DefaultCalloc(count, size)
 #define MEMORY_REALLOC(orig, size) Memory_DefaultRealloc(orig, size)
 #define MEMORY_FREE(ptr) Memory_DefaultFree(ptr)
+
+#define MEMORY_TEMP_MALLOC(size) Memory_DefaultTempMalloc(size)
+#define MEMORY_TEMP_CALLOC(count, size) Memory_DefaultTempCalloc(count, size)
+#define MEMORY_TEMP_REALLOC(orig, size) Memory_DefaultTempRealloc(orig, size)
+#define MEMORY_TEMP_FREE(ptr) Memory_DefaultTempFree(ptr)
+
+
+#if AL2O3_PLATFORM == AL2O3_PLATFORM_WINDOWS
+AL2O3_EXTERN_C void* _alloca(size_t size);
+#define STACK_ALLOC(size) _alloca(size)
+#else
+AL2O3_EXTERN_C void* alloca(size_t size);
+#define STACK_ALLOC(size) alloca(size)
+#endif
 
 #endif // AL2O3_MEMORY_MEMORY_H
