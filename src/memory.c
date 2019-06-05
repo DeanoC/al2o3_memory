@@ -17,18 +17,18 @@ AL2O3_EXTERN_C void Memory_DefaultFree(void* memory) {
 	Memory_GlobalAllocator.free(memory);
 }
 
-AL2O3_EXTERN_C void* Memory_TempDefaultMalloc(size_t size) {
+AL2O3_EXTERN_C void* Memory_DefaultTempMalloc(size_t size) {
 	return Memory_GlobalTempAllocator.malloc(size);
 }
-AL2O3_EXTERN_C void* Memory_TempDefaultCalloc(size_t count, size_t size) {
+AL2O3_EXTERN_C void* Memory_DefaultTempCalloc(size_t count, size_t size) {
 	return Memory_GlobalTempAllocator.calloc(count, size);
 }
 
-AL2O3_EXTERN_C void* Memory_TempDefaultRealloc(void* memory, size_t size) {
+AL2O3_EXTERN_C void* Memory_DefaultTempRealloc(void* memory, size_t size) {
 	return Memory_GlobalTempAllocator.realloc(memory, size);
 }
 
-AL2O3_EXTERN_C void Memory_TempDefaultFree(void* memory) {
+AL2O3_EXTERN_C void Memory_DefaultTempFree(void* memory) {
 	Memory_GlobalTempAllocator.free(memory);
 }
 
