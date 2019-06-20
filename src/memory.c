@@ -1,6 +1,8 @@
 #include "al2o3_memory/memory.h"
 
+#if AL2O3_PLATFORM == AL2O3_PLATFORM_WINDOWS
 #include "malloc.h"
+#endif
 
 AL2O3_EXTERN_C void* Memory_DefaultMalloc(size_t size) {
 	return Memory_GlobalAllocator.malloc(size);
