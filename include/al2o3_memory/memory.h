@@ -34,10 +34,10 @@ AL2O3_EXTERN_C void* Memory_DefaultTempCalloc(size_t count, size_t size);
 AL2O3_EXTERN_C void* Memory_DefaultTempRealloc(void* memory, size_t size);
 AL2O3_EXTERN_C void Memory_DefaultTempFree(void* memory);
 
-#define MEMORY_ALLOCATOR_MALLOC(size, allocator) (allocator)->malloc(size)
-#define MEMORY_ALLOCATOR_CALLOC(count, size, allocator) (allocator)->calloc(count, size)
-#define MEMORY_ALLOCATOR_REALLOC(orig, size, allocator) (allocator)->realloc(orig, size)
-#define MEMORY_ALLOCATOR_FREE(ptr, allocator) (allocator)->free(ptr)
+#define MEMORY_ALLOCATOR_MALLOC(allocator, size) (allocator)->malloc(size)
+#define MEMORY_ALLOCATOR_CALLOC(allocator, count, size) (allocator)->calloc(count, size)
+#define MEMORY_ALLOCATOR_REALLOC(allocator, orig, size) (allocator)->realloc(orig, size)
+#define MEMORY_ALLOCATOR_FREE(allocator, ptr) (allocator)->free(ptr)
 
 #define MEMORY_MALLOC(size) Memory_DefaultMalloc(size)
 #define MEMORY_CALLOC(count, size) Memory_DefaultCalloc(count, size)
