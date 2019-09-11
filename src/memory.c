@@ -47,7 +47,7 @@ AL2O3_FORCE_INLINE void* platformRealloc(void* ptr, size_t size) {
 	// https://trac.ffmpeg.org/ticket/6403
 	// i'll live with it and assert it
 	ptr = realloc(ptr, size);
-	ASSERT(((uintptr_t) ptr & ~0xFUL) == 0);
+	ASSERT(((uintptr_t) ptr & 0xFUL) == 0);
 	return ptr;
 }
 
@@ -62,20 +62,20 @@ AL2O3_FORCE_INLINE void* alloca(size_t size);
 // on all other platforms we assume 16-byte alignment by default
 static void *platformMalloc(size_t size) {
 	void *ptr = malloc(size);
-	ASSERT(((uintptr_t) ptr & ~0xFUL) == 0);
+	ASSERT(((uintptr_t) ptr & 0xFUL) == 0);
 	return ptr;
 }
 
 static void *platformCalloc(size_t count, size_t size) {
 	void *ptr = calloc(count, size);
-	ASSERT(((uintptr_t) ptr & ~0xFUL) == 0);
+	ASSERT(((uintptr_t) ptr & 0xFUL) == 0);
 	return ptr;
 
 }
 
 static void *platformRealloc(void *ptr, size_t size) {
 	ptr = realloc(ptr, size);
-	ASSERT(((uintptr_t) ptr & ~0xFUL) == 0);
+	ASSERT(((uintptr_t) ptr & 0xFUL) == 0);
 	return ptr;
 }
 
