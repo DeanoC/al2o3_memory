@@ -2,9 +2,6 @@
 // Summary: Apache 2.0
 
 #pragma once
-#ifndef AL2O3_MEMORY_MEMORY_H
-#define AL2O3_MEMORY_MEMORY_H
-
 #include "al2o3_platform/platform.h"
 
 typedef void* (*Memory_MallocFunc)(size_t size);
@@ -19,6 +16,7 @@ typedef struct Memory_Allocator {
 	Memory_Free free;
 } Memory_Allocator;
 
+// TODO optional memory tracking
 AL2O3_EXTERN_C Memory_Allocator Memory_GlobalAllocator;
 AL2O3_EXTERN_C Memory_Allocator Memory_GlobalTempAllocator;
 
@@ -49,13 +47,14 @@ AL2O3_EXTERN_C void Memory_DefaultTempFree(void* memory);
 #define MEMORY_TEMP_REALLOC(orig, size) Memory_DefaultTempRealloc(orig, size)
 #define MEMORY_TEMP_FREE(ptr) Memory_DefaultTempFree(ptr)
 
-
 #if AL2O3_PLATFORM == AL2O3_PLATFORM_WINDOWS
+
 AL2O3_EXTERN_C void* _alloca(size_t size);
 #define STACK_ALLOC(size) _alloca(size)
-#else
-AL2O3_EXTERN_C void* alloca(size_t size);
-#define STACK_ALLOC(size) alloca(size)
-#endif
 
-#endif // AL2O3_MEMORY_MEMORY_H
+#else
+
+AL2O3_FORCE_INLINE void *alloca(size_t size);
+#define STACK_ALLOC(size) alloca(size)
+
+#endif
