@@ -8,8 +8,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-         os: [ubuntu-latest]
 #        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [ubuntu-latest]
 
 
     steps:
@@ -23,24 +23,20 @@ jobs:
       run: |
         cd build
         cmake --build . -j 8
-  build_tests:
+  unittest:
     needs: build
-    name: Build unitests on ${{ matrix.os }}
+    name: Build and run unittests on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-         os: [ubuntu-latest]
 #        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [ubuntu-latest]
 
     steps:
     - uses: actions/checkout@v1
-    - name: prepare
+    - name: test
       run: |
         mkdir -p build
         cd build
-        cmake -Dunittests=ON ..
-    - name: build
-      run: |
-        cd build
-        cmake --build . -j 8
-        ctest .
+        ctest --build-and-test .. . --build-options unittests=ON -j 8
+       
