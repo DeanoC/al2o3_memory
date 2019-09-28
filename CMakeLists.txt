@@ -1,9 +1,8 @@
 cmake_minimum_required(VERSION 3.12.4)
 
-option(unittests "unittests" OFF)
-
 get_directory_property(hasParent PARENT_DIRECTORY)
 if(NOT hasParent)
+	option(unittests "unittests" OFF)
 	include(FetchContent)
 	FetchContent_Declare( al2o3 GIT_REPOSITORY https://github.com/DeanoC/al2o3 GIT_TAG master )
 	FetchContent_GetProperties(al2o3)
