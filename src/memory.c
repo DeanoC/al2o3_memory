@@ -29,12 +29,15 @@ AL2O3_FORCE_INLINE void platformFree(void* ptr)
 #elif AL2O3_PLATFORM == AL2O3_PLATFORM_UNIX
 AL2O3_FORCE_INLINE void* platformMalloc(size_t size)
 {
-	return posix_memalign(16, size);
+	void* mem;
+	posix_memalign(&mem, 16, size);
+	return mem;	
 }
 
 AL2O3_FORCE_INLINE void* platformCalloc(size_t count, size_t size)
 {
-	void* mem =  posix_memalign(16, count * size);
+	void* mem;
+	posix_memalign(&mem, 16, count * size);
 	if(mem) {
 		memset(mem, 0, count * size);
 	}

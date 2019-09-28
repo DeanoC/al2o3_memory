@@ -48,13 +48,12 @@ AL2O3_EXTERN_C void Memory_DefaultTempFree(void* memory);
 #define MEMORY_TEMP_FREE(ptr) Memory_DefaultTempFree(ptr)
 
 #if AL2O3_PLATFORM == AL2O3_PLATFORM_WINDOWS
-
 AL2O3_EXTERN_C void* _alloca(size_t size);
 #define STACK_ALLOC(size) _alloca(size)
 
 #else
 
-AL2O3_FORCE_INLINE void *alloca(size_t size);
+#include "alloca.h"
 #define STACK_ALLOC(size) alloca(size)
 
 #endif
