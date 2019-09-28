@@ -1,4 +1,4 @@
-![](https://github.com/DeanoC/al2o3_memory/workflows/CI/badge.svg)
+![](https://github.com/DeanoC/al2o3_memory/workflows/Master/badge.svg)
 
 # al2o3_memory
 memory functions and cross library/platform replaceable malloc/free etc
