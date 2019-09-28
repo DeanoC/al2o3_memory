@@ -28,16 +28,13 @@ set(Deps
 		al2o3_platform)
 ADD_LIB(${LibName} "${Interface}" "${Src}" "${Deps}")
 
-if(unittests)
-	include(CTest)
-	set( Tests
-		runner.cpp
-		test_memory.cpp
-		)
-	set( TestDeps
-		al2o3_catch2 )
-	ADD_LIB_TESTS(${LibName} "${Interface}" "${Tests}" "${TestDeps}")
-	add_test(NAME test_${LibName} 
-		COMMAND test_${LibName}
-		WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-endif()
+set( Tests
+	runner.cpp
+	test_memory.cpp
+	)
+set( TestDeps
+	al2o3_catch2 )
+ADD_LIB_TESTS(${LibName} "${Interface}" "${Tests}" "${TestDeps}")
+add_test(NAME test_${LibName} 
+	COMMAND test_${LibName}
+	WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
