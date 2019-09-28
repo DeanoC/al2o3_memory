@@ -35,6 +35,4 @@ set( Tests
 set( TestDeps
 	al2o3_catch2 )
 ADD_LIB_TESTS(${LibName} "${Interface}" "${Tests}" "${TestDeps}")
-add_test(NAME test_${LibName} 
-	COMMAND test_${LibName}
-	WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+
