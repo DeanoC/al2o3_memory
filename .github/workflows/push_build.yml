@@ -46,5 +46,6 @@ jobs:
         cmake --build . -j 8
     - name: test
       run: |
+        case build
         ctest . -j 8
        
