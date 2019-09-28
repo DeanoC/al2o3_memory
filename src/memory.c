@@ -27,14 +27,15 @@ AL2O3_FORCE_INLINE void platformFree(void* ptr)
 }
 
 #elif AL2O3_PLATFORM == AL2O3_PLATFORM_UNIX
-AL2O3_FORCE_INLINE void* platformMalloc(size_t size)
+
+static void* platformMalloc(size_t size)
 {
 	void* mem;
 	posix_memalign(&mem, 16, size);
 	return mem;	
 }
 
-AL2O3_FORCE_INLINE void* platformCalloc(size_t count, size_t size)
+static void* platformCalloc(size_t count, size_t size)
 {
 	void* mem;
 	posix_memalign(&mem, 16, count * size);
@@ -44,7 +45,7 @@ AL2O3_FORCE_INLINE void* platformCalloc(size_t count, size_t size)
 	return mem;
 }
 
-AL2O3_FORCE_INLINE void* platformRealloc(void* ptr, size_t size) {
+static void* platformRealloc(void* ptr, size_t size) {
 	// technically this appears to be a bit dodgy but given
 	// chromium and ffmpeg do this according to
 	// https://trac.ffmpeg.org/ticket/6403
@@ -54,12 +55,10 @@ AL2O3_FORCE_INLINE void* platformRealloc(void* ptr, size_t size) {
 	return ptr;
 }
 
-AL2O3_FORCE_INLINE void platformFree(void* ptr)
+static void platformFree(void* ptr)
 {
 	free(ptr);
 }
-AL2O3_FORCE_INLINE void* alloca(size_t size);
-#define STACK_ALLOC(size) alloca(size)
 
 #else
 // on all other platforms we assume 16-byte alignment by default
