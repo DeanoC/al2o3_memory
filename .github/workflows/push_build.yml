@@ -1,4 +1,4 @@
-name: Master
+name: BuildAndTest
 
 on: [push]
 
@@ -10,14 +10,13 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
 
-
     steps:
     - uses: actions/checkout@v1
     - name: prepare
       run: |
         mkdir -p build
         cd build
-        cmake ..
+        cmake -CRelease ..
     - name: build
       run: |
         cd build
@@ -36,7 +35,7 @@ jobs:
       run: |
         mkdir -p build
         cd build
-        cmake -Dunittests=ON ..
+        cmake -CRelease -Dunittests=ON ..
     - name: build
       run: |
         cd build
@@ -44,5 +43,5 @@ jobs:
     - name: test
       run: |
         cd build
-        ctest . -j 8
+        ctest . -j 8 -C Release 
        
