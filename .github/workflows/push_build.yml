@@ -34,7 +34,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - uses: actions/checkout@v1
     - name: prepare
       run: |
         mkdir -p build
@@ -46,6 +45,6 @@ jobs:
         cmake --build . -j 8
     - name: test
       run: |
-        case build
+        cd build
         ctest . -j 8
        
