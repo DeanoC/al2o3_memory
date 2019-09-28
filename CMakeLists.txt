@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12.4)
 
-option(_build_tests "unittests" OFF)
+option(unittests "unittests" OFF)
 
 get_directory_property(hasParent PARENT_DIRECTORY)
 if(NOT hasParent)
@@ -29,7 +29,7 @@ set(Deps
 		al2o3_platform)
 ADD_LIB(${LibName} "${Interface}" "${Src}" "${Deps}")
 
-if(_build_tests)
+if(unittests)
 	set( Tests
 		runner.cpp
 		test_memory.cpp
