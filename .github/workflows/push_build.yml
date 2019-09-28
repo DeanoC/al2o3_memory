@@ -34,9 +34,17 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: test
+    - uses: actions/checkout@v1
+    - name: prepare
       run: |
         mkdir -p build
         cd build
-        ctest --build-and-test .. . --build-options unittests=ON -j 8
+        cmake -Dunitests=ON ..
+    - name: build
+      run: |
+        cd build
+        cmake --build . -j 8
+    - name: test
+      run: |
+        ctest . -j 8
        
