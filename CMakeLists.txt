@@ -30,7 +30,7 @@ set(Deps
 ADD_LIB(${LibName} "${Interface}" "${Src}" "${Deps}")
 
 if(unittests)
-	include(CTEST)
+	include(CTest)
 	set( Tests
 		runner.cpp
 		test_memory.cpp
