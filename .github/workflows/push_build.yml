@@ -16,11 +16,11 @@ jobs:
       run: |
         mkdir -p build
         cd build
-        cmake -CRelease ..
+        cmake ..
     - name: build
       run: |
         cd build
-        cmake --build . -j 8
+        cmake --build . --config Release -j 8
   unittest:
     needs: build
     name: Build and run unittests on ${{ matrix.os }}
@@ -35,13 +35,13 @@ jobs:
       run: |
         mkdir -p build
         cd build
-        cmake -CRelease -Dunittests=ON ..
+        cmake -Dunittests=ON ..
     - name: build
       run: |
         cd build
-        cmake --build . -j 8
+        cmake --build . --config Release -j 8
     - name: test
       run: |
         cd build
-        ctest . -j 8 -C Release 
+        ctest . -j 8 -c Release 
        
