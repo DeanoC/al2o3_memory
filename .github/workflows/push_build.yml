@@ -39,7 +39,7 @@ jobs:
       run: |
         mkdir -p build
         cd build
-        cmake -Dunitests=ON ..
+        cmake -Dunittests=ON ..
     - name: build
       run: |
         cd build
