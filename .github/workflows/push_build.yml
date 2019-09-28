@@ -1,0 +1,42 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: prepare
+      run: |
+        mkdir -p build
+        cd build
+        cmake ..
+    - name: build
+      run: |
+        cd build
+        cmake --build . -j 8
+  build_tests:
+    needs: build
+    name: Build unitests on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: prepare
+      run: |
+        mkdir -p build
+        cd build
+        cmake -Dunittests=ON ..
+    - name: build
+      run: |
+        cd build
+        cmake --build . -j 8
