@@ -8,6 +8,11 @@ AL2O3_FORCE_INLINE void* platformMalloc(size_t size)
 	return _aligned_malloc(size, 16);
 }
 
+AL2O3_FORCE_INLINE void* platformAalloc(size_t size, size_t align)
+{
+	return _aligned_malloc(size, align);
+}
+
 AL2O3_FORCE_INLINE void* platformCalloc(size_t count, size_t size)
 {
 	void* mem =  _aligned_malloc(count * size, 16);
@@ -26,13 +31,20 @@ AL2O3_FORCE_INLINE void platformFree(void* ptr)
 	_aligned_free(ptr);
 }
 
-#elif AL2O3_PLATFORM == AL2O3_PLATFORM_UNIX
+#elif AL2O3_PLATFORM == AL2O3_PLATFORM_UNIX || AL2O3_PLATFORM_OS == AL2O3_OS_OSX
 
 static void* platformMalloc(size_t size)
 {
 	void* mem;
 	posix_memalign(&mem, 16, size);
 	return mem;	
+}
+
+static void* platformAalloc(size_t size, size_t align)
+{
+	void* mem;
+	posix_memalign(&mem, align, size);
+	return mem;
 }
 
 static void* platformCalloc(size_t count, size_t size)
@@ -61,34 +73,19 @@ static void platformFree(void* ptr)
 }
 
 #else
-// on all other platforms we assume 16-byte alignment by default
-static void *platformMalloc(size_t size) {
-	void *ptr = malloc(size);
-	ASSERT(((uintptr_t) ptr & 0xFUL) == 0);
-	return ptr;
-}
 
-static void *platformCalloc(size_t count, size_t size) {
-	void *ptr = calloc(count, size);
-	ASSERT(((uintptr_t) ptr & 0xFUL) == 0);
-	return ptr;
+#error Unsupported platform
 
-}
-
-static void *platformRealloc(void *ptr, size_t size) {
-	ptr = realloc(ptr, size);
-	ASSERT(((uintptr_t) ptr & 0xFUL) == 0);
-	return ptr;
-}
-
-static void platformFree(void *ptr) {
-	free(ptr);
-}
 #endif
 
 AL2O3_EXTERN_C void* Memory_DefaultMalloc(size_t size) {
 	return Memory_GlobalAllocator.malloc(size);
 }
+
+AL2O3_EXTERN_C void* Memory_DefaultAalloc(size_t size, size_t align) {
+	return Memory_GlobalAllocator.aalloc(size, align);
+}
+
 AL2O3_EXTERN_C void* Memory_DefaultCalloc(size_t count, size_t size) {
 	return Memory_GlobalAllocator.calloc(count, size);
 }
@@ -104,6 +101,10 @@ AL2O3_EXTERN_C void Memory_DefaultFree(void* memory) {
 AL2O3_EXTERN_C void* Memory_DefaultTempMalloc(size_t size) {
 	return Memory_GlobalTempAllocator.malloc(size);
 }
+AL2O3_EXTERN_C void* Memory_DefaultTempAalloc(size_t count, size_t align) {
+	return Memory_GlobalTempAllocator.aalloc(count, align);
+}
+
 AL2O3_EXTERN_C void* Memory_DefaultTempCalloc(size_t count, size_t size) {
 	return Memory_GlobalTempAllocator.calloc(count, size);
 }
@@ -119,6 +120,7 @@ AL2O3_EXTERN_C void Memory_DefaultTempFree(void* memory) {
 
 AL2O3_EXTERN_C Memory_Allocator Memory_GlobalAllocator = {
 		&platformMalloc,
+		&platformAalloc,
 		&platformCalloc,
 		&platformRealloc,
 		&platformFree
@@ -127,6 +129,7 @@ AL2O3_EXTERN_C Memory_Allocator Memory_GlobalAllocator = {
 // TODO specialise
 AL2O3_EXTERN_C Memory_Allocator Memory_GlobalTempAllocator = {
 		&platformMalloc,
+		&platformAalloc,
 		&platformCalloc,
 		&platformRealloc,
 		&platformFree
