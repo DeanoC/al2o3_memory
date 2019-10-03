@@ -123,7 +123,7 @@ static AllocUnit *hashTable[hashSize];
 static AllocUnit *reservoir;
 static AllocUnit **reservoirBuffer = NULL;
 static uint32_t reservoirBufferSize = 0;
-static const uint32_t paddingSize = 4;
+const uint32_t paddingSize = 4;
 
 // ---------------------------------------------------------------------------------------------------------------------------------
 AL2O3_FORCE_INLINE size_t calculateActualSize(const size_t reportedSize) {
