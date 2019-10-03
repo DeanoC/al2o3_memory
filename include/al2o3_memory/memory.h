@@ -4,6 +4,17 @@
 #pragma once
 #include "al2o3_platform/platform.h"
 
+// by default we enable memory tracking setup, which adds as small cost to every
+// alloc (cost of a function and a few copies) however it also causes the exe
+// to be bloated by file/line info at every alloc call site.
+// so for final master set MEMORY_TRACKING_SETUP to 0 to remove this overhead
+// as well
+// Whether memory tracking is actually done (not just the setup) is decided
+// inside memory.c
+#ifndef MEMORY_TRACKING_SETUP
+#define MEMORY_TRACKING_SETUP 1
+#endif
+
 typedef void* (*Memory_MallocFunc)(size_t size);
 typedef void* (*Memory_AallocFunc)(size_t size, size_t align);
 typedef void* (*Memory_CallocFunc)(size_t count, size_t size);
@@ -18,23 +29,23 @@ typedef struct Memory_Allocator {
 	Memory_Free free;
 } Memory_Allocator;
 
-// TODO optional memory tracking
+// always returns true
+AL2O3_EXTERN_C bool Memory_TrackerPushNextSrcLoc(const char *sourceFile, const unsigned int sourceLine, const char *sourceFunc);
+
+// call this at exit, when tracking is on will log all non freed items, if no tracking does nothing
+AL2O3_EXTERN_C void Memory_TrackerDestroyAndLogLeaks();
+
 AL2O3_EXTERN_C Memory_Allocator Memory_GlobalAllocator;
-AL2O3_EXTERN_C Memory_Allocator Memory_GlobalTempAllocator;
 
-AL2O3_EXTERN_C void* Memory_DefaultMalloc(size_t size);
-AL2O3_EXTERN_C void* Memory_DefaultAalloc(size_t count, size_t align); // aligned alloc
-AL2O3_EXTERN_C void* Memory_DefaultCalloc(size_t count, size_t size);
-AL2O3_EXTERN_C void* Memory_DefaultRealloc(void* memory, size_t size);
-AL2O3_EXTERN_C void Memory_DefaultFree(void* memory);
+#if MEMORY_TRACKING_SETUP == 1
 
-// temp allocs shouldn't be expected to live that long, they may come out of faster
-// smaller pool
-AL2O3_EXTERN_C void* Memory_DefaultTempMalloc(size_t size);
-AL2O3_EXTERN_C void* Memory_DefaultTempAalloc(size_t count, size_t align);
-AL2O3_EXTERN_C void* Memory_DefaultTempCalloc(size_t count, size_t size);
-AL2O3_EXTERN_C void* Memory_DefaultTempRealloc(void* memory, size_t size);
-AL2O3_EXTERN_C void Memory_DefaultTempFree(void* memory);
+#define MEMORY_ALLOCATOR_MALLOC(allocator, size) ((Memory_TrackerPushNextSrcLoc(__FILE__, __LINE__, __FUNCTION__)) ? (allocator)->malloc(size) : NULL)
+#define MEMORY_ALLOCATOR_AALLOC(allocator, size, align) ((Memory_TrackerPushNextSrcLoc(__FILE__, __LINE__, __FUNCTION__)) ? (allocator)->aalloc(size, align) : NULL)
+#define MEMORY_ALLOCATOR_CALLOC(allocator, count, size) ((Memory_TrackerPushNextSrcLoc(__FILE__, __LINE__, __FUNCTION__)) ? (allocator)->calloc(count, size) : NULL)
+#define MEMORY_ALLOCATOR_REALLOC(allocator, orig, size) ((Memory_TrackerPushNextSrcLoc(__FILE__, __LINE__, __FUNCTION__)) ? (allocator)->realloc(orig, size) : NULL)
+#define MEMORY_ALLOCATOR_FREE(allocator, ptr) (allocator)->free(ptr)
+
+#else
 
 #define MEMORY_ALLOCATOR_MALLOC(allocator, size) (allocator)->malloc(size)
 #define MEMORY_ALLOCATOR_AALLOC(allocator, size, align) (allocator)->aalloc(size, align)
@@ -42,17 +53,20 @@ AL2O3_EXTERN_C void Memory_DefaultTempFree(void* memory);
 #define MEMORY_ALLOCATOR_REALLOC(allocator, orig, size) (allocator)->realloc(orig, size)
 #define MEMORY_ALLOCATOR_FREE(allocator, ptr) (allocator)->free(ptr)
 
-#define MEMORY_MALLOC(size) Memory_DefaultMalloc(size)
-#define MEMORY_AALLOC(size, align) Memory_DefaultAalloc(size, align)
-#define MEMORY_CALLOC(count, size) Memory_DefaultCalloc(count, size)
-#define MEMORY_REALLOC(orig, size) Memory_DefaultRealloc(orig, size)
-#define MEMORY_FREE(ptr) Memory_DefaultFree(ptr)
+#endif
 
-#define MEMORY_TEMP_MALLOC(size) Memory_DefaultTempMalloc(size)
-#define MEMORY_TEMP_AALLOC(count, align) Memory_DefaultTempAalloc(count, align)
-#define MEMORY_TEMP_CALLOC(count, size) Memory_DefaultTempCalloc(count, size)
-#define MEMORY_TEMP_REALLOC(orig, size) Memory_DefaultTempRealloc(orig, size)
-#define MEMORY_TEMP_FREE(ptr) Memory_DefaultTempFree(ptr)
+#define MEMORY_MALLOC(size) MEMORY_ALLOCATOR_MALLOC(&Memory_GlobalAllocator, size)
+#define MEMORY_AALLOC(size, align) MEMORY_ALLOCATOR_AALLOC(&Memory_GlobalAllocator, size, align)
+#define MEMORY_CALLOC(count, size) MEMORY_ALLOCATOR_CALLOC(&Memory_GlobalAllocator, count, size)
+#define MEMORY_REALLOC(orig, size) MEMORY_ALLOCATOR_REALLOC(&Memory_GlobalAllocator, orig, size)
+#define MEMORY_FREE(ptr) MEMORY_ALLOCATOR_FREE(&Memory_GlobalAllocator, ptr)
+
+// TODO temp pool
+#define MEMORY_TEMP_MALLOC(size) MEMORY_ALLOCATOR_MALLOC(&Memory_GlobalAllocator, size)
+#define MEMORY_TEMP_AALLOC(size, align) MEMORY_ALLOCATOR_AALLOC(&Memory_GlobalAllocator, size, align)
+#define MEMORY_TEMP_CALLOC(count, size) MEMORY_ALLOCATOR_CALLOC(&Memory_GlobalAllocator, count, size)
+#define MEMORY_TEMP_REALLOC(orig, size) MEMORY_ALLOCATOR_REALLOC(&Memory_GlobalAllocator,orig, size)
+#define MEMORY_TEMP_FREE(ptr) MEMORY_ALLOCATOR_FREE(&Memory_GlobalAllocator, ptr)
 
 #if AL2O3_PLATFORM == AL2O3_PLATFORM_WINDOWS
 AL2O3_EXTERN_C void* _alloca(size_t size);
