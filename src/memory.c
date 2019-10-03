@@ -214,7 +214,7 @@ static bool GrowReservoir() {
 	return true;
 }
 
-static void *TrackedAlloc(const char *sourceFile,
+void *TrackedAlloc(const char *sourceFile,
 									 const unsigned int sourceLine,
 									 const char *sourceFunc,
 									 const size_t reportedSize,
@@ -268,7 +268,7 @@ static void *TrackedAlloc(const char *sourceFile,
 	return au->reportedAddress;
 }
 
-static void *TrackedAAlloc(const char *sourceFile,
+void *TrackedAAlloc(const char *sourceFile,
 										const unsigned int sourceLine,
 										const char *sourceFunc,
 										const size_t reportedSize,
@@ -319,7 +319,7 @@ static void *TrackedAAlloc(const char *sourceFile,
 	return au->reportedAddress;
 }
 
-static void *TrackedRealloc(const char *sourceFile,
+void *TrackedRealloc(const char *sourceFile,
 										 const unsigned int sourceLine,
 										 const char *sourceFunc,
 										 const size_t reportedSize,
@@ -401,7 +401,7 @@ static void *TrackedRealloc(const char *sourceFile,
 	return au->reportedAddress;
 }
 
-static bool TrackedFree(const char *sourceFile,
+bool TrackedFree(const char *sourceFile,
 								 const unsigned int sourceLine,
 								 const char *sourceFunc,
 								 const void *reportedAddress) {
@@ -446,17 +446,17 @@ static bool TrackedFree(const char *sourceFile,
 	return adjustPtr;
 }
 
-AL2O3_FORCE_INLINE AL2O3_EXTERN_C void *trackedMalloc(size_t size) {
+AL2O3_EXTERN_C void *trackedMalloc(size_t size) {
 	void *mem = platformMalloc(calculateActualSize(size));
 	return TrackedAlloc(g_lastSourceFile, g_lastSourceLine, g_lastSourceFunc, size, mem);
 }
 
-AL2O3_FORCE_INLINE AL2O3_EXTERN_C void *trackedAalloc(size_t size, size_t align) {
+AL2O3_EXTERN_C void *trackedAalloc(size_t size, size_t align) {
 	void *mem = platformAalloc(calculateActualSize(size), align);
 	return TrackedAAlloc(g_lastSourceFile, g_lastSourceLine, g_lastSourceFunc, size, mem);
 }
 
-AL2O3_FORCE_INLINE AL2O3_EXTERN_C void *trackedCalloc(size_t count, size_t size) {
+AL2O3_EXTERN_C void *trackedCalloc(size_t count, size_t size) {
 	void *mem = platformMalloc(calculateActualSize(count * size));
 	if (mem) {
 		memset(mem, 0, calculateActualSize(count * size));
@@ -464,12 +464,12 @@ AL2O3_FORCE_INLINE AL2O3_EXTERN_C void *trackedCalloc(size_t count, size_t size)
 	return TrackedAlloc(g_lastSourceFile, g_lastSourceLine, g_lastSourceFunc, count * size, mem);
 }
 
-AL2O3_FORCE_INLINE AL2O3_EXTERN_C void *trackedRealloc(void *ptr, size_t size) {
+AL2O3_EXTERN_C void *trackedRealloc(void *ptr, size_t size) {
 	void *mem = platformRealloc(calculateActualAddress(ptr), calculateActualSize(size));
 	return TrackedRealloc(g_lastSourceFile, g_lastSourceLine, g_lastSourceFunc, size, ptr, mem);
 }
 
-AL2O3_FORCE_INLINE AL2O3_EXTERN_C void trackedFree(void *ptr) {
+AL2O3_EXTERN_C void trackedFree(void *ptr) {
 	bool const adjustPtr = TrackedFree(g_lastSourceFile, g_lastSourceLine, g_lastSourceFunc, ptr);
 	if (adjustPtr) {
 		platformFree(calculateActualAddress(ptr));
