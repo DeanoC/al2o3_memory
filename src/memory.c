@@ -3,6 +3,8 @@
 char const *g_lastSourceFile = NULL;
 unsigned int g_lastSourceLine = 0;
 char const *g_lastSourceFunc = NULL;
+static uint64_t g_allocCounter = 0;
+static uint64_t g_breakOnAllocNumber = 0;
 
 #if !defined(MEMORY_TRACKING)
 #define MEMORY_TRACKING 1
@@ -10,7 +12,7 @@ char const *g_lastSourceFunc = NULL;
 
 #if MEMORY_TRACKING == 1
 #if !defined(MEMORY_TRACKING_SETUP) || MEMORY_TRACKING_SETUP == 0
-#error MEMORY_TRACKING requires MMEMORY_TRACKING_SETUP == 1
+#error MEMORY_TRACKING requires MEMORY_TRACKING_SETUP == 1
 #endif
 #endif
 
@@ -99,22 +101,33 @@ AL2O3_FORCE_INLINE AL2O3_EXTERN_C void platformFree(void* ptr)
 
 #if MEMORY_TRACKING == 1
 
+#include "al2o3_os/thread.h"
+#define MUTEX_LOCK Os_MutexAcquire(&g_allocMutex);
+#define MUTEX_UNLOCK Os_MutexRelease(&g_allocMutex);
+
+
 // ---------------------------------------------------------------------------------------------------------------------------------
 // Originally created on 12/22/2000 by Paul Nettle
 //
 // Copyright 2000, Fluid Studios, Inc., all rights reserved.
 // ---------------------------------------------------------------------------------------------------------------------------------
+#define REPORTED_ADDRESS_BITS_MASK(x) (((uintptr_t)(x)) & 0xF)
+#define REPORTED_ADDRESS_BITES_SAME_AS_REPORTED 0x1
+
+#define CLEAN_REPORTED_ADDRESS(x) (void*)(((uintptr_t)(x)) & ~0xF)
+
 typedef struct AllocUnit {
-	void *actualAddress;
-	void *reportedAddress;
+	void *uncleanReportedAddress; //address is always at least 16 byte aligned so we stuff things in the bottom four bit!
 	char const *sourceFile;
 	char const *sourceFunc;
 	struct AllocUnit *next;
 	struct AllocUnit *prev;
 
-	size_t reportedSize;
+	uint64_t allocationNumber;
 
+	uint32_t reportedSize; // as most allocs will be less 4GiB we assume we saturate to 4GiB should be enough to spot
 	uint32_t sourceLine;
+
 } AllocUnit;
 
 #define hashBits 12u
@@ -124,6 +137,7 @@ static AllocUnit *reservoir;
 static AllocUnit **reservoirBuffer = NULL;
 static uint32_t reservoirBufferSize = 0;
 const uint32_t paddingSize = 4;
+static Os_Mutex_t g_allocMutex;
 
 // ---------------------------------------------------------------------------------------------------------------------------------
 AL2O3_FORCE_INLINE size_t calculateActualSize(const size_t reportedSize) {
@@ -138,6 +152,9 @@ AL2O3_FORCE_INLINE void *calculateActualAddress(const void *reportedAddress) {
 	// We allow this...
 	if (!reportedAddress) {
 		return NULL;
+	}
+	if( REPORTED_ADDRESS_BITS_MASK(reportedAddress) & REPORTED_ADDRESS_BITES_SAME_AS_REPORTED) {
+		return (void*) (((uintptr_t)reportedAddress) & ~0xF);
 	}
 
 	// JUst account for the padding
@@ -155,13 +172,16 @@ AL2O3_FORCE_INLINE void *calculateReportedAddress(const void *actualAddress) {
 }
 
 static const char *sourceFileStripper(const char *sourceFile) {
-	const char *ptr = strrchr(sourceFile, '\\');
-	if (ptr) {
-		return ptr + 1;
-	}
-	ptr = strrchr(sourceFile, '/');
-	if (ptr) {
-		return ptr + 1;
+	char const* ptr = sourceFile + strlen(sourceFile);
+	uint32_t slashCount = 0;
+	while(ptr > sourceFile) {
+		if(*ptr == '\\' || *ptr == '/') {
+			slashCount++;
+			if(slashCount == 3) {
+				return ptr + 1;
+			}
+		}
+		ptr--;
 	}
 	return sourceFile;
 }
@@ -176,7 +196,7 @@ static AllocUnit *findAllocUnit(const void *reportedAddress) {
 	uintptr_t hashIndex = (((uintptr_t) reportedAddress) >> 4) & (hashSize - 1);
 	AllocUnit *ptr = hashTable[hashIndex];
 	while (ptr) {
-		if (ptr->reportedAddress == reportedAddress) {
+		if (CLEAN_REPORTED_ADDRESS(ptr->uncleanReportedAddress) == reportedAddress) {
 			return ptr;
 		}
 		ptr = ptr->next;
@@ -189,10 +209,9 @@ static bool GrowReservoir() {
 	// Allocate 256 reservoir elements
 	reservoir = (AllocUnit *) platformMalloc(sizeof(AllocUnit) * 256);
 
-	// If you hit this assert, then the memory manager failed to allocate internal memory for tracking the
-	// allocations
-	ASSERT(reservoir != NULL);
-
+	if(reservoirBufferSize == 0) {
+		Os_MutexCreate(&g_allocMutex);
+	}
 	// Danger Will Robinson!
 	if (reservoir == NULL) {
 		return false;
@@ -211,6 +230,7 @@ static bool GrowReservoir() {
 		reservoirBuffer = temp;
 		reservoirBuffer[reservoirBufferSize++] = reservoir;
 	}
+
 	return true;
 }
 
@@ -219,15 +239,26 @@ void *TrackedAlloc(const char *sourceFile,
 									 const char *sourceFunc,
 									 const size_t reportedSize,
 									 void *actualSizedAllocation) {
+	MUTEX_LOCK
+
+	if(g_breakOnAllocNumber != 0 && g_breakOnAllocNumber == g_allocCounter+1) {
+		AL2O3_DEBUG_BREAK();
+	}
 
 	// If necessary, grow the reservoir of unused allocation units
 	if (!reservoir) {
 		if (!GrowReservoir()) {
+			MUTEX_UNLOCK
 			return NULL;
 		}
 	}
 	if(sourceFile == NULL) {
-		int a = 0;
+		AL2O3_DEBUG_BREAK();
+	}
+	if (actualSizedAllocation == NULL) {
+		LOGERROR("Request for allocation failed. Out of memory.");
+		MUTEX_UNLOCK
+		return NULL;
 	}
 
 	// Logical flow says this should never happen...
@@ -239,21 +270,15 @@ void *TrackedAlloc(const char *sourceFile,
 
 	// Populate it with some real data
 	memset(au, 0, sizeof(AllocUnit));
-	au->actualAddress = actualSizedAllocation;
 	au->reportedSize = reportedSize;
-	au->reportedAddress = calculateReportedAddress(au->actualAddress);
+	au->uncleanReportedAddress = calculateReportedAddress(actualSizedAllocation);
 	au->sourceFile = sourceFile;
 	au->sourceLine = sourceLine;
 	au->sourceFunc = sourceFunc;
-
-	// We don't want to assert with random failures, because we want the application to deal with them.
-	if (au->actualAddress == NULL) {
-		LOGERROR("Request for allocation failed. Out of memory.");
-		return NULL;
-	}
+	au->allocationNumber = g_allocCounter++;
 
 	// Insert the new allocation into the hash table
-	uintptr_t hashIndex = (((uintptr_t) au->reportedAddress) >> 4) & (hashSize - 1);
+	uintptr_t hashIndex = (((uintptr_t) au->uncleanReportedAddress) >> 4) & (hashSize - 1);
 	if (hashTable[hashIndex]) {
 		hashTable[hashIndex]->prev = au;
 	}
@@ -265,7 +290,9 @@ void *TrackedAlloc(const char *sourceFile,
 	g_lastSourceLine = 0;
 	g_lastSourceFunc = NULL;
 
-	return au->reportedAddress;
+	MUTEX_UNLOCK
+
+	return CLEAN_REPORTED_ADDRESS(au->uncleanReportedAddress);
 }
 
 void *TrackedAAlloc(const char *sourceFile,
@@ -273,12 +300,25 @@ void *TrackedAAlloc(const char *sourceFile,
 										const char *sourceFunc,
 										const size_t reportedSize,
 										void *actualSizedAllocation) {
+	MUTEX_LOCK
+
+	if(g_breakOnAllocNumber != 0 && g_breakOnAllocNumber == g_allocCounter+1) {
+		AL2O3_DEBUG_BREAK();
+	}
 
 	// If necessary, grow the reservoir of unused allocation units
 	if (!reservoir) {
 		if (!GrowReservoir()) {
+			MUTEX_UNLOCK
 			return NULL;
 		}
+	}
+
+	// We don't want to assert with random failures, because we want the application to deal with them.
+	if (actualSizedAllocation == NULL) {
+		LOGERROR("Request for allocation failed. Out of memory.");
+		MUTEX_UNLOCK
+		return NULL;
 	}
 
 	// Logical flow says this should never happen...
@@ -290,21 +330,18 @@ void *TrackedAAlloc(const char *sourceFile,
 
 	// Populate it with some real data
 	memset(au, 0, sizeof(AllocUnit));
-	au->actualAddress = actualSizedAllocation;
 	au->reportedSize = reportedSize;
-	au->reportedAddress = au->actualAddress; // alignment means reported == actual
+	au->uncleanReportedAddress = actualSizedAllocation;
 	au->sourceFile = sourceFile;
 	au->sourceLine = sourceLine;
 	au->sourceFunc = sourceFunc;
+	au->allocationNumber = g_allocCounter++;
 
-	// We don't want to assert with random failures, because we want the application to deal with them.
-	if (au->actualAddress == NULL) {
-		LOGERROR("Request for allocation failed. Out of memory.");
-		return NULL;
-	}
+	// or in reported == allocated bit
+	au->uncleanReportedAddress = (void*)(((uintptr_t)au->uncleanReportedAddress) | REPORTED_ADDRESS_BITES_SAME_AS_REPORTED);
 
 	// Insert the new allocation into the hash table
-	uintptr_t hashIndex = (((uintptr_t) au->reportedAddress) >> 4) & (hashSize - 1);
+	uintptr_t hashIndex = (((uintptr_t) au->uncleanReportedAddress) >> 4) & (hashSize - 1);
 	if (hashTable[hashIndex]) {
 		hashTable[hashIndex]->prev = au;
 	}
@@ -316,7 +353,9 @@ void *TrackedAAlloc(const char *sourceFile,
 	g_lastSourceLine = 0;
 	g_lastSourceFunc = NULL;
 
-	return au->reportedAddress;
+	MUTEX_UNLOCK
+
+	return CLEAN_REPORTED_ADDRESS(au->uncleanReportedAddress);
 }
 
 void *TrackedRealloc(const char *sourceFile,
@@ -326,9 +365,13 @@ void *TrackedRealloc(const char *sourceFile,
 										 void *reportedAddress,
 										 void *actualSizedAllocation) {
 	// Calling realloc with a NULL should force same operations as a malloc
-
 	if (!reportedAddress) {
 		return TrackedAlloc(sourceFile, sourceLine, sourceFunc, reportedSize, actualSizedAllocation);
+	}
+	MUTEX_LOCK
+
+	if(g_breakOnAllocNumber != 0 && g_breakOnAllocNumber == g_allocCounter+1) {
+		AL2O3_DEBUG_BREAK();
 	}
 
 	// Locate the existing allocation unit
@@ -337,6 +380,7 @@ void *TrackedRealloc(const char *sourceFile,
 	// If you hit this assert, you tried to reallocate RAM that wasn't allocated by this memory manager.
 	if (au == NULL) {
 		LOGERROR("Request to reallocate RAM that was never allocated");
+		MUTEX_UNLOCK
 		return NULL;
 	}
 
@@ -350,20 +394,21 @@ void *TrackedRealloc(const char *sourceFile,
 
 	if (!actualSizedAllocation) {
 		LOGERROR("Request for reallocation failed. Out of memory.");
+		MUTEX_UNLOCK
 		return NULL;
 	}
 
 	// Update the allocation with the new information
-	au->actualAddress = actualSizedAllocation;
 	au->reportedSize = calculateReportedSize(newActualSize);
-	au->reportedAddress = calculateReportedAddress(actualSizedAllocation);
+	au->uncleanReportedAddress = calculateReportedAddress(actualSizedAllocation);
 	au->sourceFile = sourceFile;
 	au->sourceLine = sourceLine;
 	au->sourceFunc = sourceFunc;
+	au->allocationNumber = g_allocCounter++;
 
 	// The reallocation may cause the address to change, so we should relocate our allocation unit within the hash table
 	unsigned int hashIndex = ~0;
-	if (oldReportedAddress != au->reportedAddress) {
+	if (oldReportedAddress != CLEAN_REPORTED_ADDRESS(au->uncleanReportedAddress)) {
 		// Remove this allocation unit from the hash table
 		{
 			uintptr_t hashIndex = (((uintptr_t) reportedAddress) >> 4) & (hashSize - 1);
@@ -380,7 +425,7 @@ void *TrackedRealloc(const char *sourceFile,
 		}
 
 		// Re-insert it back into the hash table
-		hashIndex = (((uintptr_t) au->reportedAddress) >> 4) & (hashSize - 1);
+		hashIndex = (((uintptr_t) au->uncleanReportedAddress) >> 4) & (hashSize - 1);
 		if (hashTable[hashIndex]) {
 			hashTable[hashIndex]->prev = au;
 		}
@@ -397,29 +442,36 @@ void *TrackedRealloc(const char *sourceFile,
 	g_lastSourceLine = 0;
 	g_lastSourceFunc = NULL;
 
+	MUTEX_UNLOCK
+
 	// Return the (reported) address of the new allocation unit
-	return au->reportedAddress;
+	return CLEAN_REPORTED_ADDRESS(au->uncleanReportedAddress);
 }
 
 bool TrackedFree(const char *sourceFile,
 								 const unsigned int sourceLine,
 								 const char *sourceFunc,
 								 const void *reportedAddress) {
-
-	// We should only ever get here with a null pointer if they try to do so with a call to free() (delete[] and delete will
-	// both bail before they get here.) So, since ANSI allows free(NULL), we'll not bother trying to actually free the allocated
-	// memory or track it any further.
 	if (!reportedAddress) {
 		return false;
+	}
+
+	MUTEX_LOCK
+
+	if(reservoirBuffer == NULL) {
+		LOGERROR("Free after exit (c++ static). No tracking available");
+		MUTEX_UNLOCK
+		return true; // we can tell if this is an aalloc or other assume other as more common...
 	}
 
 	// Go get the allocation unit
 	AllocUnit *au = findAllocUnit(reportedAddress);
 	if (au == NULL) {
 		LOGERROR("Request to deallocate RAM that was never allocated");
+		MUTEX_UNLOCK
 		return false;
 	}
-	bool const adjustPtr = (au->actualAddress != au->reportedAddress);
+	bool const adjustPtr = (REPORTED_ADDRESS_BITS_MASK(au->uncleanReportedAddress) & REPORTED_ADDRESS_BITES_SAME_AS_REPORTED) == 0;
 
 	// Wipe the deallocated RAM with a new pattern. This doen't actually do us much good in debug mode under WIN32,
 	// because Microsoft's memory debugging & tracking utilities will wipe it right after we do. Oh well.
@@ -427,7 +479,7 @@ bool TrackedFree(const char *sourceFile,
 	//	wipeWithPattern(au, releasedPattern);
 
 	// Remove this allocation unit from the hash table
-	uintptr_t hashIndex = (((uintptr_t) au->reportedAddress) >> 4) & (hashSize - 1);
+	uintptr_t hashIndex = (((uintptr_t) au->uncleanReportedAddress) >> 4) & (hashSize - 1);
 	if (hashTable[hashIndex] == au) {
 		hashTable[hashIndex] = au->next;
 	} else {
@@ -443,6 +495,8 @@ bool TrackedFree(const char *sourceFile,
 	memset(au, 0, sizeof(AllocUnit));
 	au->next = reservoir;
 	reservoir = au;
+	MUTEX_UNLOCK
+
 	return adjustPtr;
 }
 
@@ -452,6 +506,9 @@ AL2O3_EXTERN_C void *trackedMalloc(size_t size) {
 }
 
 AL2O3_EXTERN_C void *trackedAalloc(size_t size, size_t align) {
+	if( align <= 16) {
+		return trackedMalloc(size);
+	}
 	void *mem = platformAalloc(calculateActualSize(size), align);
 	return TrackedAAlloc(g_lastSourceFile, g_lastSourceLine, g_lastSourceFunc, size, mem);
 }
@@ -487,6 +544,7 @@ AL2O3_EXTERN_C Memory_Allocator Memory_GlobalAllocator = {
 };
 
 AL2O3_EXTERN_C void Memory_TrackerDestroyAndLogLeaks() {
+	MUTEX_LOCK
 	bool loggedHeader = 0;
 	for (int i = 0; i < hashSize; ++i) {
 		AllocUnit *au = hashTable[i];
@@ -497,9 +555,9 @@ AL2O3_EXTERN_C void Memory_TrackerDestroyAndLogLeaks() {
 			}
 			if(au->sourceFile) {
 				char const *fileNameOnly = sourceFileStripper(au->sourceFile);
-				LOGINFO("%u bytes from %s(%u): %s", au->reportedSize, fileNameOnly, au->sourceLine, au->sourceFunc);
+				LOGINFO("%u bytes from %s(%u): %s number: %u", au->reportedSize, fileNameOnly, au->sourceLine, au->sourceFunc, au->allocationNumber);
 			} else {
-				LOGINFO("%u bytes from an unknown caller", au->reportedSize);
+				LOGINFO("%u bytes from an unknown caller number: %u", au->reportedSize, au->allocationNumber);
 			}
 			au = au->next;
 		}
@@ -510,6 +568,12 @@ AL2O3_EXTERN_C void Memory_TrackerDestroyAndLogLeaks() {
 		platformFree(reservoirBuffer[i]);
 	}
 	reservoirBuffer = NULL;
+	reservoir = NULL;
+
+	memset(hashTable, 0, sizeof(AllocUnit*) * hashSize);
+	MUTEX_UNLOCK
+
+	Os_MutexDestroy(&g_allocMutex);
 }
 
 #else
