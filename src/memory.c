@@ -130,7 +130,7 @@ static void Mini_MutexRelease(Mini_Mutex_t *mutex) {
 	ASSERT(mutex);
 	pthread_mutex_unlock(mutex);
 }
-#elif AL2O3_PLATFORM_OS == AL2O3_PLATFORM_WINDOWS
+#elif AL2O3_PLATFORM == AL2O3_PLATFORM_WINDOWS
 #include "al2o3_platform/windows.h"
 #if AL2O3_CPU_BIT_SIZE == 32
 typedef struct { char dummy[24]; } Mini_Mutex_t;
