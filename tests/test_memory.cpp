@@ -25,7 +25,5 @@ TEST_CASE("CDict create/destroy", "[al2o3 Memory]") {
 	MEMORY_FREE(am0);
 	MEMORY_FREE(m2);
 	MEMORY_FREE(m1);
-
-	MEMORY_MALLOC(10); // check the leak detector by inspection
 }
 

@@ -263,9 +263,6 @@ static bool GrowReservoir() {
 	// Allocate 256 reservoir elements
 	reservoir = (AllocUnit *) platformMalloc(sizeof(AllocUnit) * 256);
 
-	if(reservoirBufferSize == 0) {
-		Mini_MutexCreate(&g_allocMutex);
-	}
 	// Danger Will Robinson!
 	if (reservoir == NULL) {
 		return false;
@@ -293,19 +290,24 @@ void *TrackedAlloc(const char *sourceFile,
 									 const char *sourceFunc,
 									 const size_t reportedSize,
 									 void *actualSizedAllocation) {
-	MUTEX_LOCK
 
-	if(g_breakOnAllocNumber != 0 && g_breakOnAllocNumber == g_allocCounter+1) {
-		AL2O3_DEBUG_BREAK();
+	if (reservoirBufferSize == 0) {
+		Mini_MutexCreate(&g_allocMutex);
 	}
 
+	MUTEX_LOCK
 	// If necessary, grow the reservoir of unused allocation units
 	if (!reservoir) {
-		if (!GrowReservoir()) {
+			if (!GrowReservoir()) {
 			MUTEX_UNLOCK
 			return NULL;
 		}
 	}
+
+	if (g_breakOnAllocNumber != 0 && g_breakOnAllocNumber == g_allocCounter + 1) {
+		AL2O3_DEBUG_BREAK();
+	}
+
 	if(sourceFile == NULL) {
 		AL2O3_DEBUG_BREAK();
 	}
@@ -324,7 +326,7 @@ void *TrackedAlloc(const char *sourceFile,
 
 	// Populate it with some real data
 	memset(au, 0, sizeof(AllocUnit));
-	au->reportedSize = reportedSize;
+	au->reportedSize = (reportedSize > 0xFFFFFFFF) ? (uint32_t)(0xFFFFFFFF) : (uint32_t) reportedSize;
 	au->uncleanReportedAddress = calculateReportedAddress(actualSizedAllocation);
 	au->sourceFile = sourceFile;
 	au->sourceLine = sourceLine;
@@ -354,6 +356,10 @@ void *TrackedAAlloc(const char *sourceFile,
 										const char *sourceFunc,
 										const size_t reportedSize,
 										void *actualSizedAllocation) {
+	if (reservoirBufferSize == 0) {
+		Mini_MutexCreate(&g_allocMutex);
+	}
+
 	MUTEX_LOCK
 
 	if(g_breakOnAllocNumber != 0 && g_breakOnAllocNumber == g_allocCounter+1) {
@@ -384,7 +390,7 @@ void *TrackedAAlloc(const char *sourceFile,
 
 	// Populate it with some real data
 	memset(au, 0, sizeof(AllocUnit));
-	au->reportedSize = reportedSize;
+	au->reportedSize = (reportedSize > 0xFFFFFFFF) ? (uint32_t)(0xFFFFFFFF) : (uint32_t)reportedSize;
 	au->uncleanReportedAddress = actualSizedAllocation;
 	au->sourceFile = sourceFile;
 	au->sourceLine = sourceLine;
@@ -453,7 +459,7 @@ void *TrackedRealloc(const char *sourceFile,
 	}
 
 	// Update the allocation with the new information
-	au->reportedSize = calculateReportedSize(newActualSize);
+	au->reportedSize = (calculateReportedSize(newActualSize) > 0xFFFFFFFF) ? (uint32_t)(0xFFFFFFFF) : (uint32_t)calculateReportedSize(newActualSize);
 	au->uncleanReportedAddress = calculateReportedAddress(actualSizedAllocation);
 	au->sourceFile = sourceFile;
 	au->sourceLine = sourceLine;
@@ -508,6 +514,10 @@ bool TrackedFree(const char *sourceFile,
 								 const void *reportedAddress) {
 	if (!reportedAddress) {
 		return false;
+	}
+
+	if (reservoirBufferSize == 0) {
+		Mini_MutexCreate(&g_allocMutex);
 	}
 
 	MUTEX_LOCK
