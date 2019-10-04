@@ -101,9 +101,55 @@ AL2O3_FORCE_INLINE AL2O3_EXTERN_C void platformFree(void* ptr)
 
 #if MEMORY_TRACKING == 1
 
-#include "al2o3_os/thread.h"
-#define MUTEX_LOCK Os_MutexAcquire(&g_allocMutex);
-#define MUTEX_UNLOCK Os_MutexRelease(&g_allocMutex);
+#if AL2O3_PLATFORM_OS == AL2O3_OS_OSX || AL2O3_PLATFORM == AL2O3_PLATFORM_UNIX
+#include <unistd.h>
+#include <sys/sysctl.h>
+#if defined(__linux__)
+#include <sys/sysinfo.h>
+#endif
+#include <pthread.h>
+
+typedef pthread_mutex_t Mini_Mutex_t;
+static bool Mini_MutexCreate(Mini_Mutex_t *mutex) {
+	ASSERT(mutex);
+	return pthread_mutex_init(mutex, NULL) == 0;
+}
+
+static void Mini_MutexDestroy(Mini_Mutex_t *mutex) {
+	ASSERT(mutex);
+	pthread_mutex_destroy(mutex);
+}
+
+static void Mini_MutexAcquire(Mini_Mutex_t *mutex) {
+	ASSERT(mutex);
+	pthread_mutex_lock(mutex);
+
+}
+
+static void Mini_MutexRelease(Mini_Mutex_t *mutex) {
+	ASSERT(mutex);
+	pthread_mutex_unlock(mutex);
+}
+#elif AL2O3_PLATFORM_OS == AL2O3_PLATFORM_WINDOWS
+#include "al2o3_platform/windows.h"
+static bool Mini_MutexCreate(Os_Mutex_t *mutex) {
+  InitializeCriticalSection((CRITICAL_SECTION *) mutex);
+  return true;
+}
+static void Mini_MutexDestroy(Os_Mutex_t *mutex) {
+  DeleteCriticalSection((CRITICAL_SECTION *) mutex);
+}
+
+static void Mini_MutexAcquire(Os_Mutex_t *mutex) {
+  EnterCriticalSection((CRITICAL_SECTION *) mutex);
+}
+static void Mini_MutexRelease(Os_Mutex_t *mutex) {
+  LeaveCriticalSection((CRITICAL_SECTION *) mutex);
+}
+#endif
+
+#define MUTEX_LOCK Mini_MutexAcquire(&g_allocMutex);
+#define MUTEX_UNLOCK Mini_MutexRelease(&g_allocMutex);
 
 
 // ---------------------------------------------------------------------------------------------------------------------------------
@@ -137,7 +183,7 @@ static AllocUnit *reservoir;
 static AllocUnit **reservoirBuffer = NULL;
 static uint32_t reservoirBufferSize = 0;
 const uint32_t paddingSize = 4;
-static Os_Mutex_t g_allocMutex;
+static Mini_Mutex_t g_allocMutex;
 
 // ---------------------------------------------------------------------------------------------------------------------------------
 AL2O3_FORCE_INLINE size_t calculateActualSize(const size_t reportedSize) {
@@ -210,7 +256,7 @@ static bool GrowReservoir() {
 	reservoir = (AllocUnit *) platformMalloc(sizeof(AllocUnit) * 256);
 
 	if(reservoirBufferSize == 0) {
-		Os_MutexCreate(&g_allocMutex);
+		Mini_MutexCreate(&g_allocMutex);
 	}
 	// Danger Will Robinson!
 	if (reservoir == NULL) {
@@ -573,7 +619,7 @@ AL2O3_EXTERN_C void Memory_TrackerDestroyAndLogLeaks() {
 	memset(hashTable, 0, sizeof(AllocUnit*) * hashSize);
 	MUTEX_UNLOCK
 
-	Os_MutexDestroy(&g_allocMutex);
+	Mini_MutexDestroy(&g_allocMutex);
 }
 
 #else

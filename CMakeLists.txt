@@ -27,7 +27,6 @@ set(Src
 		)
 set(Deps
 		al2o3_platform
-		al2o3_os # this shouldn't really be here but we need mutex for memory tracking
 		)
 ADD_LIB(${LibName} "${Interface}" "${Src}" "${Deps}")
 
