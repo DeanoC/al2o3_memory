@@ -132,18 +132,26 @@ static void Mini_MutexRelease(Mini_Mutex_t *mutex) {
 }
 #elif AL2O3_PLATFORM_OS == AL2O3_PLATFORM_WINDOWS
 #include "al2o3_platform/windows.h"
-static bool Mini_MutexCreate(Os_Mutex_t *mutex) {
+#if AL2O3_CPU_BIT_SIZE == 32
+typedef struct { char dummy[24]; } Mini_Mutex_t;
+#elif AL2O3_CPU_BIT_SIZE == 64
+typedef struct { char dummy[40]; } Mini_Mutex_t;
+#else
+#error What bit size if this CPU?!
+#endif
+
+static bool Mini_MutexCreate(Mini_Mutex_t *mutex) {
   InitializeCriticalSection((CRITICAL_SECTION *) mutex);
   return true;
 }
-static void Mini_MutexDestroy(Os_Mutex_t *mutex) {
+static void Mini_MutexDestroy(Mini_Mutex_t *mutex) {
   DeleteCriticalSection((CRITICAL_SECTION *) mutex);
 }
 
-static void Mini_MutexAcquire(Os_Mutex_t *mutex) {
+static void Mini_MutexAcquire(Mini_Mutex_t *mutex) {
   EnterCriticalSection((CRITICAL_SECTION *) mutex);
 }
-static void Mini_MutexRelease(Os_Mutex_t *mutex) {
+static void Mini_MutexRelease(Mini_Mutex_t *mutex) {
   LeaveCriticalSection((CRITICAL_SECTION *) mutex);
 }
 #endif
