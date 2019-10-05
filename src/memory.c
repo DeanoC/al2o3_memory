@@ -331,7 +331,7 @@ void *TrackedAlloc(const char *sourceFile,
 	au->sourceFile = sourceFile;
 	au->sourceLine = sourceLine;
 	au->sourceFunc = sourceFunc;
-	au->allocationNumber = g_allocCounter++;
+	au->allocationNumber = ++g_allocCounter;
 
 	// Insert the new allocation into the hash table
 	uintptr_t hashIndex = (((uintptr_t) au->uncleanReportedAddress) >> 4) & (hashSize - 1);
@@ -395,7 +395,7 @@ void *TrackedAAlloc(const char *sourceFile,
 	au->sourceFile = sourceFile;
 	au->sourceLine = sourceLine;
 	au->sourceFunc = sourceFunc;
-	au->allocationNumber = g_allocCounter++;
+	au->allocationNumber = ++g_allocCounter;
 
 	// or in reported == allocated bit
 	au->uncleanReportedAddress = (void*)(((uintptr_t)au->uncleanReportedAddress) | REPORTED_ADDRESS_BITES_SAME_AS_REPORTED);
@@ -464,7 +464,7 @@ void *TrackedRealloc(const char *sourceFile,
 	au->sourceFile = sourceFile;
 	au->sourceLine = sourceLine;
 	au->sourceFunc = sourceFunc;
-	au->allocationNumber = g_allocCounter++;
+	au->allocationNumber = ++g_allocCounter;
 
 	// The reallocation may cause the address to change, so we should relocate our allocation unit within the hash table
 	unsigned int hashIndex = ~0;
@@ -633,6 +633,7 @@ AL2O3_EXTERN_C void Memory_TrackerDestroyAndLogLeaks() {
 	}
 	reservoirBuffer = NULL;
 	reservoir = NULL;
+	reservoirBufferSize = 0;
 
 	memset(hashTable, 0, sizeof(AllocUnit*) * hashSize);
 	MUTEX_UNLOCK
