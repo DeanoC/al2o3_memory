@@ -39,11 +39,36 @@ AL2O3_EXTERN_C Memory_Allocator Memory_GlobalAllocator;
 
 #if MEMORY_TRACKING_SETUP == 1
 
+#define Memory_TrackingPaddingSize 4
 #define MEMORY_ALLOCATOR_MALLOC(allocator, size) ((Memory_TrackerPushNextSrcLoc(__FILE__, __LINE__, __FUNCTION__)) ? (allocator)->malloc(size) : NULL)
 #define MEMORY_ALLOCATOR_AALLOC(allocator, size, align) ((Memory_TrackerPushNextSrcLoc(__FILE__, __LINE__, __FUNCTION__)) ? (allocator)->aalloc(size, align) : NULL)
 #define MEMORY_ALLOCATOR_CALLOC(allocator, count, size) ((Memory_TrackerPushNextSrcLoc(__FILE__, __LINE__, __FUNCTION__)) ? (allocator)->calloc(count, size) : NULL)
 #define MEMORY_ALLOCATOR_REALLOC(allocator, orig, size) ((Memory_TrackerPushNextSrcLoc(__FILE__, __LINE__, __FUNCTION__)) ? (allocator)->realloc(orig, size) : NULL)
 #define MEMORY_ALLOCATOR_FREE(allocator, ptr) (allocator)->free(ptr)
+
+// to use tracking on custom allocated, add these in the same way trackedMalloc etc in memory.c does for the
+// default platform allocator (e.g. adjust size of alloc except aligned alloc and call tracked after ur custom alloc)
+AL2O3_FORCE_INLINE size_t Memory_TrackerCalculateActualSize(const size_t reportedSize) {
+	return reportedSize + Memory_TrackingPaddingSize * sizeof(uint32_t) * 2;
+}
+
+AL2O3_EXTERN_C void *Memory_TrackedAlloc(const char *sourceFile,
+																				 const unsigned int sourceLine,
+																				 const char *sourceFunc,
+																				 const size_t reportedSize,
+																				 void *actualSizedAllocation);
+AL2O3_EXTERN_C void *Memory_TrackedAAlloc(const char *sourceFile,
+																					const unsigned int sourceLine,
+																					const char *sourceFunc,
+																					const size_t reportedSize,
+																					void *actualSizedAllocation);
+AL2O3_EXTERN_C void *Memory_TrackedRealloc(const char *sourceFile,
+																					 const unsigned int sourceLine,
+																					 const char *sourceFunc,
+																					 const size_t reportedSize,
+																					 void *reportedAddress,
+																					 void *actualSizedAllocation);
+AL2O3_EXTERN_C bool Memory_TrackedFree(const void *reportedAddress);
 
 #else
 
@@ -52,6 +77,11 @@ AL2O3_EXTERN_C Memory_Allocator Memory_GlobalAllocator;
 #define MEMORY_ALLOCATOR_CALLOC(allocator, count, size) (allocator)->calloc(count, size)
 #define MEMORY_ALLOCATOR_REALLOC(allocator, orig, size) (allocator)->realloc(orig, size)
 #define MEMORY_ALLOCATOR_FREE(allocator, ptr) (allocator)->free(ptr)
+
+#define Memory_TrackerCalculateActualSize(reportedSize) (reportedSize)
+AL2O3_EXTERN_C void *Memory_TrackedAlloc(const char * a,const unsigned int b, const char * c, const size_t d, void * e);
+AL2O3_EXTERN_C void *Memory_TrackedAAlloc(const char * a, const unsigned int b, const char * c, const size_t d, void * e);
+AL2O3_EXTERN_C void *Memory_TrackedRealloc(const char *a ,const unsigned int b, const char * c,const size_t d,void * e,void *f);
 
 #endif
 
