@@ -4,7 +4,7 @@ AL2O3_THREAD_LOCAL char const *g_lastSourceFile = NULL;
 AL2O3_THREAD_LOCAL unsigned int g_lastSourceLine = 0;
 AL2O3_THREAD_LOCAL char const *g_lastSourceFunc = NULL;
 static uint64_t g_allocCounter = 0;
-static uint64_t g_breakOnAllocNumber = 0;
+uint64_t Memory_TrackerBreakOnAllocNumber = 0; // set this here or in code before the allocation occurs to break
 
 // #define MEMORY_TRACKING 0 will switch off the cost of tracking bar 3 TLS pushing and memory for the strings
 // #define MEMORY_TRACKING_SETUP 0 in header will remove this overhead as well..
@@ -266,7 +266,7 @@ AL2O3_EXTERN_C void *Memory_TrackedAlloc(const char *sourceFile,
 		}
 	}
 
-	if (g_breakOnAllocNumber != 0 && g_breakOnAllocNumber == g_allocCounter + 1) {
+	if (Memory_TrackerBreakOnAllocNumber != 0 && Memory_TrackerBreakOnAllocNumber == g_allocCounter + 1) {
 		LOGWARNING("Break on allocation number hit");
 		AL2O3_DEBUG_BREAK();
 	}
@@ -326,7 +326,7 @@ AL2O3_EXTERN_C void *Memory_TrackedAAlloc(const char *sourceFile,
 
 	MUTEX_LOCK
 
-	if(g_breakOnAllocNumber != 0 && g_breakOnAllocNumber == g_allocCounter+1) {
+	if(Memory_TrackerBreakOnAllocNumber != 0 && Memory_TrackerBreakOnAllocNumber == g_allocCounter+1) {
 		LOGWARNING("Break on allocation number hit");
 		AL2O3_DEBUG_BREAK();
 	}
@@ -399,7 +399,7 @@ AL2O3_EXTERN_C void *Memory_TrackedRealloc(const char *sourceFile,
 
 	MUTEX_LOCK
 
-	if(g_breakOnAllocNumber != 0 && g_breakOnAllocNumber == g_allocCounter+1) {
+	if(Memory_TrackerBreakOnAllocNumber != 0 && Memory_TrackerBreakOnAllocNumber == g_allocCounter+1) {
 		LOGWARNING("Break on allocation number hit");
 		AL2O3_DEBUG_BREAK();
 	}

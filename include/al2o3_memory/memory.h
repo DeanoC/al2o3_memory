@@ -34,6 +34,7 @@ AL2O3_EXTERN_C bool Memory_TrackerPushNextSrcLoc(const char *sourceFile, const u
 
 // call this at exit, when tracking is on will log all non freed items, if no tracking does nothing
 AL2O3_EXTERN_C void Memory_TrackerDestroyAndLogLeaks();
+AL2O3_EXTERN_C uint64_t Memory_TrackerBreakOnAllocNumber; // set before the allocation occurs to break in memory tracking (0 disables)
 
 AL2O3_EXTERN_C Memory_Allocator Memory_GlobalAllocator;
 
