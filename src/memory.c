@@ -1,8 +1,8 @@
 #include "al2o3_memory/memory.h"
 
-char const *g_lastSourceFile = NULL;
-unsigned int g_lastSourceLine = 0;
-char const *g_lastSourceFunc = NULL;
+AL2O3_THREAD_LOCAL char const *g_lastSourceFile = NULL;
+AL2O3_THREAD_LOCAL unsigned int g_lastSourceLine = 0;
+AL2O3_THREAD_LOCAL char const *g_lastSourceFunc = NULL;
 static uint64_t g_allocCounter = 0;
 static uint64_t g_breakOnAllocNumber = 0;
 
@@ -109,55 +109,23 @@ AL2O3_FORCE_INLINE AL2O3_EXTERN_C void platformFree(void* ptr)
 #endif
 #include <pthread.h>
 
-typedef pthread_mutex_t Mini_Mutex_t;
-static bool Mini_MutexCreate(Mini_Mutex_t *mutex) {
-	ASSERT(mutex);
-	return pthread_mutex_init(mutex, NULL) == 0;
-}
+static pthread_mutex_t g_allocMutex = PTHREAD_MUTEX_INITIALIZER;
+#define MUTEX_CREATE
+#define MUTEX_DESTROY
+#define MUTEX_LOCK   pthread_mutex_lock(&g_allocMutex);
+#define MUTEX_UNLOCK pthread_mutex_unlock(&g_allocMutex);
 
-static void Mini_MutexDestroy(Mini_Mutex_t *mutex) {
-	ASSERT(mutex);
-	pthread_mutex_destroy(mutex);
-}
-
-static void Mini_MutexAcquire(Mini_Mutex_t *mutex) {
-	ASSERT(mutex);
-	pthread_mutex_lock(mutex);
-
-}
-
-static void Mini_MutexRelease(Mini_Mutex_t *mutex) {
-	ASSERT(mutex);
-	pthread_mutex_unlock(mutex);
-}
 #elif AL2O3_PLATFORM == AL2O3_PLATFORM_WINDOWS
 #include "al2o3_platform/windows.h"
-#if AL2O3_CPU_BIT_SIZE == 32
-typedef struct { char dummy[24]; } Mini_Mutex_t;
-#elif AL2O3_CPU_BIT_SIZE == 64
-typedef struct { char dummy[40]; } Mini_Mutex_t;
-#else
-#error What bit size if this CPU?!
+
+static CRITICAL_SECTION g_allocMutex;
+#define MUTEX_CREATE InitializeCriticalSection(&g_allocMutex);
+#define MUTEX_DESTROY DeleteCriticalSection(&g_allocMutex);
+#define MUTEX_LOCK   EnterCriticalSection(&g_allocMutex);
+#define MUTEX_UNLOCK LeaveCriticalSection(&g_allocMutex);
+
 #endif
 
-static bool Mini_MutexCreate(Mini_Mutex_t *mutex) {
-  InitializeCriticalSection((CRITICAL_SECTION *) mutex);
-  return true;
-}
-static void Mini_MutexDestroy(Mini_Mutex_t *mutex) {
-  DeleteCriticalSection((CRITICAL_SECTION *) mutex);
-}
-
-static void Mini_MutexAcquire(Mini_Mutex_t *mutex) {
-  EnterCriticalSection((CRITICAL_SECTION *) mutex);
-}
-static void Mini_MutexRelease(Mini_Mutex_t *mutex) {
-  LeaveCriticalSection((CRITICAL_SECTION *) mutex);
-}
-#endif
-
-#define MUTEX_LOCK Mini_MutexAcquire(&g_allocMutex);
-#define MUTEX_UNLOCK Mini_MutexRelease(&g_allocMutex);
 
 
 // ---------------------------------------------------------------------------------------------------------------------------------
@@ -191,7 +159,6 @@ static AllocUnit *reservoir;
 static AllocUnit **reservoirBuffer = NULL;
 static uint32_t reservoirBufferSize = 0;
 const uint32_t paddingSize = 4;
-static Mini_Mutex_t g_allocMutex;
 
 // ---------------------------------------------------------------------------------------------------------------------------------
 AL2O3_FORCE_INLINE size_t calculateActualSize(const size_t reportedSize) {
@@ -261,15 +228,13 @@ static AllocUnit *findAllocUnit(const void *reportedAddress) {
 
 static bool GrowReservoir() {
 	// Allocate 256 reservoir elements
-	reservoir = (AllocUnit *) platformMalloc(sizeof(AllocUnit) * 256);
-
+	reservoir = (AllocUnit *) platformCalloc(256, sizeof(AllocUnit));
 	// Danger Will Robinson!
 	if (reservoir == NULL) {
 		return false;
 	}
 
 	// Build a linked-list of the elements in our reservoir
-	memset(reservoir, 0, sizeof(AllocUnit) * 256);
 	for (unsigned int i = 0; i < 256 - 1; i++) {
 		reservoir[i].next = &reservoir[i + 1];
 	}
@@ -290,31 +255,32 @@ void *TrackedAlloc(const char *sourceFile,
 									 const char *sourceFunc,
 									 const size_t reportedSize,
 									 void *actualSizedAllocation) {
+	if (actualSizedAllocation == NULL) {
+		LOGERROR("Request for allocation failed. Out of memory.");
+		return NULL;
+	}
 
 	if (reservoirBufferSize == 0) {
-		Mini_MutexCreate(&g_allocMutex);
+		MUTEX_CREATE
 	}
 
 	MUTEX_LOCK
 	// If necessary, grow the reservoir of unused allocation units
 	if (!reservoir) {
 			if (!GrowReservoir()) {
-			MUTEX_UNLOCK
-			return NULL;
+				MUTEX_UNLOCK
+				return NULL;
 		}
 	}
 
 	if (g_breakOnAllocNumber != 0 && g_breakOnAllocNumber == g_allocCounter + 1) {
+		LOGWARNING("Break on allocation number hit");
 		AL2O3_DEBUG_BREAK();
 	}
 
 	if(sourceFile == NULL) {
+		LOGWARNING("Allocation without tracking file/line/function info");
 		AL2O3_DEBUG_BREAK();
-	}
-	if (actualSizedAllocation == NULL) {
-		LOGERROR("Request for allocation failed. Out of memory.");
-		MUTEX_UNLOCK
-		return NULL;
 	}
 
 	// Logical flow says this should never happen...
@@ -356,13 +322,24 @@ void *TrackedAAlloc(const char *sourceFile,
 										const char *sourceFunc,
 										const size_t reportedSize,
 										void *actualSizedAllocation) {
+	if (actualSizedAllocation == NULL) {
+		LOGERROR("Request for allocation failed. Out of memory.");
+		return NULL;
+	}
+
 	if (reservoirBufferSize == 0) {
-		Mini_MutexCreate(&g_allocMutex);
+		MUTEX_CREATE
 	}
 
 	MUTEX_LOCK
 
 	if(g_breakOnAllocNumber != 0 && g_breakOnAllocNumber == g_allocCounter+1) {
+		LOGWARNING("Break on allocation number hit");
+		AL2O3_DEBUG_BREAK();
+	}
+
+	if(sourceFile == NULL) {
+		LOGWARNING("Allocation without tracking file/line/function info");
 		AL2O3_DEBUG_BREAK();
 	}
 
@@ -372,13 +349,6 @@ void *TrackedAAlloc(const char *sourceFile,
 			MUTEX_UNLOCK
 			return NULL;
 		}
-	}
-
-	// We don't want to assert with random failures, because we want the application to deal with them.
-	if (actualSizedAllocation == NULL) {
-		LOGERROR("Request for allocation failed. Out of memory.");
-		MUTEX_UNLOCK
-		return NULL;
 	}
 
 	// Logical flow says this should never happen...
@@ -428,9 +398,21 @@ void *TrackedRealloc(const char *sourceFile,
 	if (!reportedAddress) {
 		return TrackedAlloc(sourceFile, sourceLine, sourceFunc, reportedSize, actualSizedAllocation);
 	}
+
+	if (!actualSizedAllocation) {
+		LOGERROR("Request for reallocation failed. Out of memory.");
+		return NULL;
+	}
+
 	MUTEX_LOCK
 
 	if(g_breakOnAllocNumber != 0 && g_breakOnAllocNumber == g_allocCounter+1) {
+		LOGWARNING("Break on allocation number hit");
+		AL2O3_DEBUG_BREAK();
+	}
+
+	if(sourceFile == NULL) {
+		LOGWARNING("Allocation without tracking file/line/function info");
 		AL2O3_DEBUG_BREAK();
 	}
 
@@ -451,12 +433,6 @@ void *TrackedRealloc(const char *sourceFile,
 	// Do the reallocation
 	void *oldReportedAddress = reportedAddress;
 	size_t newActualSize = calculateActualSize(reportedSize);
-
-	if (!actualSizedAllocation) {
-		LOGERROR("Request for reallocation failed. Out of memory.");
-		MUTEX_UNLOCK
-		return NULL;
-	}
 
 	// Update the allocation with the new information
 	au->reportedSize = (calculateReportedSize(newActualSize) > 0xFFFFFFFF) ? (uint32_t)(0xFFFFFFFF) : (uint32_t)calculateReportedSize(newActualSize);
@@ -508,25 +484,17 @@ void *TrackedRealloc(const char *sourceFile,
 	return CLEAN_REPORTED_ADDRESS(au->uncleanReportedAddress);
 }
 
-bool TrackedFree(const char *sourceFile,
-								 const unsigned int sourceLine,
-								 const char *sourceFunc,
-								 const void *reportedAddress) {
+bool TrackedFree(const void *reportedAddress) {
 	if (!reportedAddress) {
 		return false;
 	}
 
-	if (reservoirBufferSize == 0) {
-		Mini_MutexCreate(&g_allocMutex);
+	if (reservoirBufferSize == 0 || reservoirBuffer == NULL) {
+		LOGERROR("Free before any allocations have occured or after exit!");
+		return true; // we can't tell if this is an aalloc or other assume other as more common...
 	}
 
 	MUTEX_LOCK
-
-	if(reservoirBuffer == NULL) {
-		LOGERROR("Free after exit (c++ static). No tracking available");
-		MUTEX_UNLOCK
-		return true; // we can tell if this is an aalloc or other assume other as more common...
-	}
 
 	// Go get the allocation unit
 	AllocUnit *au = findAllocUnit(reportedAddress);
@@ -559,6 +527,7 @@ bool TrackedFree(const char *sourceFile,
 	memset(au, 0, sizeof(AllocUnit));
 	au->next = reservoir;
 	reservoir = au;
+
 	MUTEX_UNLOCK
 
 	return adjustPtr;
@@ -591,7 +560,7 @@ AL2O3_EXTERN_C void *trackedRealloc(void *ptr, size_t size) {
 }
 
 AL2O3_EXTERN_C void trackedFree(void *ptr) {
-	bool const adjustPtr = TrackedFree(g_lastSourceFile, g_lastSourceLine, g_lastSourceFunc, ptr);
+	bool const adjustPtr = TrackedFree(ptr);
 	if (adjustPtr) {
 		platformFree(calculateActualAddress(ptr));
 	} else {
@@ -638,7 +607,7 @@ AL2O3_EXTERN_C void Memory_TrackerDestroyAndLogLeaks() {
 	memset(hashTable, 0, sizeof(AllocUnit*) * hashSize);
 	MUTEX_UNLOCK
 
-	Mini_MutexDestroy(&g_allocMutex);
+	MUTEX_DESTROY
 }
 
 #else
