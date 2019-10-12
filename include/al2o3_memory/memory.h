@@ -109,3 +109,9 @@ AL2O3_EXTERN_C void* _alloca(size_t size);
 #define STACK_ALLOC(size) alloca(size)
 
 #endif
+
+#if __cplusplus
+#include <new>
+#define MEMORY_NEW(clas, ...) new( (clas*) MEMORY_MALLOC(sizeof(clas))) clas(__VA_ARGS__)
+#define MEMORY_DELETE(clas, ptr) ptr->~clas(); MEMORY_FREE(ptr);
+#endif
