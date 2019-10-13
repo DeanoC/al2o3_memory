@@ -1,7 +1,7 @@
 #include "al2o3_catch2/catch2.hpp"
 #include "al2o3_memory/memory.h"
 
-TEST_CASE("CDict create/destroy", "[al2o3 Memory]") {
+TEST_CASE("Basic tests", "[al2o3 Memory]") {
 	void* m0 = MEMORY_MALLOC(10);
 	REQUIRE(m0);
 	MEMORY_FREE(m0);
