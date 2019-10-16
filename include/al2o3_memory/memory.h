@@ -1,6 +1,4 @@
-// Full license at end of file
-// Summary: Apache 2.0
-
+// License Summary: MIT see LICENSE file
 #pragma once
 #include "al2o3_platform/platform.h"
 

@@ -1,3 +1,4 @@
+// License Summary: MIT see LICENSE file
 #include "al2o3_memory/memory.h"
 
 AL2O3_THREAD_LOCAL char const *g_lastSourceFile = NULL;
