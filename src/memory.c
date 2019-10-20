@@ -39,6 +39,9 @@ AL2O3_FORCE_INLINE AL2O3_EXTERN_C void *platformAalloc(size_t size, size_t align
 }
 
 AL2O3_FORCE_INLINE AL2O3_EXTERN_C void *platformCalloc(size_t count, size_t size) {
+	if(count == 0) {
+		return NULL;
+	}
 	void *mem = _aligned_malloc(count * size, 16);
 	if (mem) {
 		memset(mem, 0, count * size);
@@ -72,6 +75,10 @@ AL2O3_EXTERN_C void* platformAalloc(size_t size, size_t align)
 
 AL2O3_EXTERN_C void* platformCalloc(size_t count, size_t size)
 {
+	if(count == 0) {
+		return NULL;
+	}
+
 	void* mem;
 	posix_memalign(&mem, 16, count * size);
 	if(mem) {
