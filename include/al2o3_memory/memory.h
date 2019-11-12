@@ -101,6 +101,10 @@ AL2O3_EXTERN_C void *Memory_TrackedRealloc(const char *a ,const unsigned int b, 
 AL2O3_EXTERN_C void* _alloca(size_t size);
 #define STACK_ALLOC(size) _alloca(size)
 
+#elif AL2O3_PLATFORM == AL2O3_PLATFORM_UNKNOWN
+
+#define STACK_ALLOC(size) NOT_SUPPORTED
+
 #else
 
 #include "alloca.h"
