@@ -1,5 +1,6 @@
 // License Summary: MIT see LICENSE file
 #include "al2o3_memory/memory.h"
+#include "al2o3_platform/utf8.h"
 
 AL2O3_THREAD_LOCAL char const *g_lastSourceFile = NULL;
 AL2O3_THREAD_LOCAL unsigned int g_lastSourceLine = 0;
@@ -194,7 +195,7 @@ AL2O3_FORCE_INLINE void *calculateReportedAddress(const void *actualAddress) {
 }
 
 static const char *sourceFileStripper(const char *sourceFile) {
-	char const* ptr = sourceFile + strlen(sourceFile);
+	char const* ptr = sourceFile + utf8size(sourceFile);
 	uint32_t slashCount = 0;
 	while(ptr > sourceFile) {
 		if(*ptr == '\\' || *ptr == '/') {
