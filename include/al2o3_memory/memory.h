@@ -13,6 +13,10 @@
 #define MEMORY_TRACKING_SETUP 1
 #endif
 
+#if AL2O3_PLATFORM == AL2O3_PLATFORM_UNKNOWN
+#undef MEMORY_TRACKING_SETUP
+#endif
+
 typedef void* (*Memory_MallocFunc)(size_t size);
 typedef void* (*Memory_AallocFunc)(size_t size, size_t align);
 typedef void* (*Memory_CallocFunc)(size_t count, size_t size);
@@ -104,7 +108,6 @@ AL2O3_EXTERN_C void* _alloca(size_t size);
 #elif AL2O3_PLATFORM == AL2O3_PLATFORM_UNKNOWN
 
 #define STACK_ALLOC(size) NOT_SUPPORTED
-
 #else
 
 #include "alloca.h"

@@ -19,9 +19,10 @@ uint64_t Memory_TrackerBreakOnAllocNumber = 0; // set this here or in code befor
 #error MEMORY_TRACKING requires MEMORY_TRACKING_SETUP == 1
 #endif
 
-AL2O3_EXTERN_C bool Memory_TrackerPushNextSrcLoc(const char *sourceFile,
-																								 const unsigned int sourceLine,
-																								 const char *sourceFunc) {
+AL2O3_EXTERN_C bool
+Memory_TrackerPushNextSrcLoc(const char *sourceFile,
+														 const unsigned int sourceLine,
+														 const char *sourceFunc) {
 	g_lastSourceFile = sourceFile;
 	g_lastSourceLine = sourceLine;
 	g_lastSourceFunc = sourceFunc;
@@ -31,16 +32,19 @@ AL2O3_EXTERN_C bool Memory_TrackerPushNextSrcLoc(const char *sourceFile,
 #if AL2O3_PLATFORM == AL2O3_PLATFORM_WINDOWS
 #include "malloc.h"
 // on win32 we only have 8-byte alignment guaranteed, but the CRT provides special aligned allocation fns
-AL2O3_FORCE_INLINE AL2O3_EXTERN_C void *platformMalloc(size_t size) {
+AL2O3_FORCE_INLINE AL2O3_EXTERN_C
+void *platformMalloc(size_t size) {
 	return _aligned_malloc(size, 16);
 }
 
-AL2O3_FORCE_INLINE AL2O3_EXTERN_C void *platformAalloc(size_t size, size_t align) {
+AL2O3_FORCE_INLINE AL2O3_EXTERN_C
+void *platformAalloc(size_t size, size_t align) {
 	return _aligned_malloc(size, align);
 }
 
-AL2O3_FORCE_INLINE AL2O3_EXTERN_C void *platformCalloc(size_t count, size_t size) {
-	if(count == 0) {
+AL2O3_FORCE_INLINE AL2O3_EXTERN_C
+void *platformCalloc(size_t count, size_t size) {
+	if (count == 0) {
 		return NULL;
 	}
 	void *mem = _aligned_malloc(count * size, 16);
@@ -50,11 +54,13 @@ AL2O3_FORCE_INLINE AL2O3_EXTERN_C void *platformCalloc(size_t count, size_t size
 	return mem;
 }
 
-AL2O3_FORCE_INLINE AL2O3_EXTERN_C void *platformRealloc(void *ptr, size_t size) {
+AL2O3_FORCE_INLINE AL2O3_EXTERN_C
+void *platformRealloc(void *ptr, size_t size) {
 	return _aligned_realloc(ptr, size, 16);
 }
 
-AL2O3_FORCE_INLINE AL2O3_EXTERN_C void platformFree(void *ptr) {
+AL2O3_FORCE_INLINE AL2O3_EXTERN_C
+void platformFree(void *ptr) {
 	_aligned_free(ptr);
 }
 
@@ -64,7 +70,7 @@ AL2O3_EXTERN_C void* platformMalloc(size_t size)
 {
 	void* mem;
 	posix_memalign(&mem, 16, size);
-	return mem;	
+	return mem;
 }
 
 AL2O3_EXTERN_C void* platformAalloc(size_t size, size_t align)
@@ -105,7 +111,56 @@ AL2O3_EXTERN_C void platformFree(void* ptr)
 
 #else
 
-#error Unsupported platform
+AL2O3_EXTERN_C void* platformAalloc(size_t size, size_t align)
+{
+		int const offset = align - 1 + sizeof(void*);
+		void* p1 = malloc(size + offset);
+
+		if (p1 == NULL) return NULL;
+
+		void** p2 = (void**)(((size_t)(p1) + offset) & ~(align - 1));
+		p2[-1] = p1;
+
+		return p2;
+}
+
+AL2O3_EXTERN_C void* platformMalloc(size_t size)
+{
+	return platformAalloc(size, 16);
+}
+
+AL2O3_EXTERN_C void* platformCalloc(size_t count, size_t size)
+{
+	if(count == 0) {
+		return NULL;
+	}
+
+	void* mem = platformMalloc(count * size);
+	if(mem) {
+		memset(mem, 0, count * size);
+	}
+	return mem;
+}
+
+AL2O3_EXTERN_C void* platformRealloc(void* ptr, size_t size) {
+
+	// TODO store align? or at least warn if realloc on unknown with align != 16
+	int const align = 16;
+	int const offset = align - 1 + sizeof(void*);
+	void* p1 = realloc(ptr, size + offset);
+	if(!p1) return NULL;
+
+	void** p2 = (void**)(((size_t)(p1) + offset) & ~(align - 1));
+	p2[-1] = p1;
+
+	return p2;
+
+}
+
+AL2O3_EXTERN_C void platformFree(void* ptr)
+{
+	free(((void**)ptr)[-1]);
+}
 
 #endif
 
@@ -610,7 +665,8 @@ AL2O3_EXTERN_C void Memory_TrackerDestroyAndLogLeaks() {
 
 #else
 
-AL2O3_EXTERN_C Memory_Allocator Memory_GlobalAllocator = {
+AL2O3_EXTERN_C Memory_Allocator
+Memory_GlobalAllocator = {
 		&platformMalloc,
 		&platformAalloc,
 		&platformCalloc,
@@ -619,15 +675,20 @@ AL2O3_EXTERN_C Memory_Allocator Memory_GlobalAllocator = {
 };
 AL2O3_EXTERN_C void Memory_TrackerDestroyAndLogLeaks() {}
 
-AL2O3_EXTERN_C void *Memory_TrackedAlloc(const char * a,const unsigned int b, const char * c, const size_t d, void * e) {
+AL2O3_EXTERN_C void *Memory_TrackedAlloc(const char *a, const unsigned int b, const char *c, const size_t d, void *e) {
 	LOGERROR("Memory_TrackedAlloc called in non tracking build");
 	return NULL;
 };
-AL2O3_EXTERN_C void *Memory_TrackedAAlloc(const char * a, const unsigned int b, const char * c, const size_t d, void * e) {
+AL2O3_EXTERN_C void *Memory_TrackedAAlloc(const char *a, const unsigned int b, const char *c, const size_t d, void *e) {
 	LOGERROR("Memory_TrackedAAlloc called in non tracking build");
 	return NULL;
 }
-AL2O3_EXTERN_C void *Memory_TrackedRealloc(const char *a ,const unsigned int b, const char * c,const size_t d,void * e,void *f) {
+AL2O3_EXTERN_C void *Memory_TrackedRealloc(const char *a,
+																					 const unsigned int b,
+																					 const char *c,
+																					 const size_t d,
+																					 void *e,
+																					 void *f) {
 	LOGERROR("Memory_TrackedRealloc called in non tracking build");
 	return NULL;
 }
